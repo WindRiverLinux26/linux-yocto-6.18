@@ -786,6 +786,24 @@ static int dwc3_hs_phy_setup(struct dwc3 *dwc, int index)
 	return 0;
 }
 
+static void dwc3_ulpi_setup(struct dwc3 *dwc)
+{
+	int index;
+	u32 reg;
+
+	/* Don't do anything if there is no ULPI PHY */
+	if (!dwc->ulpi)
+		return;
+
+	if (dwc->enable_usb2_transceiver_delay) {
+		for (index = 0; index < dwc->num_usb2_ports; index++) {
+			reg = dwc3_readl(dwc, DWC3_GUSB2PHYCFG(index));
+			reg |= DWC3_GUSB2PHYCFG_XCVRDLY;
+			dwc3_writel(dwc, DWC3_GUSB2PHYCFG(index), reg);
+		}
+	}
+}
+
 /**
  * dwc3_phy_setup - Configure USB PHY Interface of DWC3 Core
  * @dwc: Pointer to our controller context structure
@@ -1356,7 +1374,7 @@ static void dwc3_set_cache_type(struct dwc3 *dwc)
 		device_get_match_data(dwc->dev);
 
 	if (cache_type) {
-		reg = dwc3_readl(dwc->regs,  DWC3_GSBUSCFG0);
+		reg = dwc3_readl(dwc,  DWC3_GSBUSCFG0);
 		tmp = reg;
 
 		reg &= ~DWC3_GSBUSCFG0_DATARD(~0);
@@ -1372,7 +1390,7 @@ static void dwc3_set_cache_type(struct dwc3 *dwc)
 		reg |= DWC3_GSBUSCFG0_DESCWR(cache_type->transfer_type_descwr);
 
 		if (tmp != reg)
-			dwc3_writel(dwc->regs, DWC3_GSBUSCFG0, reg);
+			dwc3_writel(dwc, DWC3_GSBUSCFG0, reg);
 	}
 }
 #endif
@@ -1406,6 +1424,8 @@ static int dwc3_core_init(struct dwc3 *dwc)
 		}
 		dwc->ulpi_ready = true;
 	}
+
+	dwc3_ulpi_setup(dwc);
 
 	if (!dwc->phys_ready) {
 		ret = dwc3_core_get_phy(dwc);
